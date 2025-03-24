@@ -11,6 +11,7 @@ namespace Projet_LivinParis
         static void Main(string[] args)
         {
             Console.WriteLine("salut");
+
         
         }
     }
