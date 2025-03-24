@@ -12,8 +12,7 @@ namespace Projet_LivinParis
         {
             int a = 0;
             int b = 0;
-            DivideByZeroException,z,
-            
+            int c = 0;
         }
     }
 }
