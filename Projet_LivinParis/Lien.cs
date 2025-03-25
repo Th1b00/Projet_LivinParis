@@ -1,34 +1,29 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Projet_LivinParis
+namespace PROJET_PSI
 {
-    internal class Lien
+    public class Lien<T>
     {
-        /// <summary>
-        /// Noeud de destination du lien.
-        /// </summary>
-        private Noeud destination;
+        private Noeud<T> destination;
+        private double poids;
 
-        /// <summary>
-        /// Définit le noeud de destination du lien.
-        /// </summary>
-        public Noeud Destination
+        public Noeud<T> Destination
         {
             get { return destination; }
             set { destination = value; }
         }
 
-        /// <summary>
-        /// Initialise une nouvelle instance de la classe Lien.
-        /// </summary>
-        /// <param name="dest">Noeud de destination du lien</param>
-        public Lien(Noeud dest)
+
+        public double Poids
+        {
+            get { return poids; }
+            set { poids = value; }
+        }
+
+        public Lien(Noeud<T> dest, double poids = 1.0)
         {
             this.destination = dest;
+            this.poids = poids;
         }
     }
 }
