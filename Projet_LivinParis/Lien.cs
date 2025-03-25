@@ -13,6 +13,7 @@ namespace PROJET_PSI
             set { destination = value; }
         }
 
+
         public double Poids
         {
             get { return poids; }
