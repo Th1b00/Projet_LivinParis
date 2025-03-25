@@ -1,12 +1,29 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Projet_LivinParis
+namespace PROJET_PSI
 {
-    internal class Lien
+    public class Lien<T>
     {
+        private Noeud<T> destination;
+        private double poids;
+
+        public Noeud<T> Destination
+        {
+            get { return destination; }
+            set { destination = value; }
+        }
+
+
+        public double Poids
+        {
+            get { return poids; }
+            set { poids = value; }
+        }
+
+        public Lien(Noeud<T> dest, double poids = 1.0)
+        {
+            this.destination = dest;
+            this.poids = poids;
+        }
     }
 }
