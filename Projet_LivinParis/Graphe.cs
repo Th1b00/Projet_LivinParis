@@ -359,5 +359,6 @@ namespace PROJET_PSI
             float dy = a.Y - b.Y;
             return (float)Math.Sqrt(dx * dx + dy * dy);
         }
+
     }
 }
