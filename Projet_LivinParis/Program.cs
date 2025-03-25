@@ -10,7 +10,7 @@ namespace Projet_LivinParis
     {
         static void Main(string[] args)
         {
-            int a = 0;
+            int b = 0;
         }
     }
 }
