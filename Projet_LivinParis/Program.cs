@@ -29,15 +29,21 @@ namespace PROJET_PSI
 
             // Calcul du plus court chemin
             Console.WriteLine($"\nDistance entre {a} et {b} :");
-            double dijkstraResult = graphe.Dijkstra(a, b);  // Cette ligne affichera l'itinéraire
+
+            // Appel de la méthode Dijkstra existante qui affiche déjà l'itinéraire
+            double dijkstraResult = graphe.Dijkstra(a, b);
             Console.WriteLine("Dijkstra       : " + dijkstraResult + " minutes");
             Console.WriteLine("Bellman-Ford   : " + graphe.BellmanFord(a, b) + " minutes");
             Console.WriteLine("Floyd-Warshall : " + graphe.FloydWarshall(a, b) + " minutes");
 
-            // Génération du dessin du graphe et sauvegarde dans un fichier image
-            Console.WriteLine("\nGénération du dessin du graphe...");
-            graphe.DessinerGraphe("graphe_metro.png");
-            Console.WriteLine("Le graphe a été enregistré sous 'graphe_metro.png'.");
+            // Génération des graphes
+            Console.WriteLine("\nGénération du dessin du graphe complet...");
+            graphe.DessinerGraphe("graphe_metro_complet.png");
+            Console.WriteLine("Le graphe complet a été enregistré sous 'graphe_metro_complet.png'.");
+
+            Console.WriteLine("\nGénération du graphe du chemin...");
+            Console.WriteLine($"\nLe graphe du chemin de {a} à {b} a été généré sous 'chemin_{a}_vers_{b}.png'");
+
 
             // Fin de l'exécution
             Console.WriteLine("\nAppuyez sur une touche pour quitter.");

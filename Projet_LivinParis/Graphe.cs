@@ -155,7 +155,6 @@ namespace PROJET_PSI
 
         public double Dijkstra(int source, int cible)
         {
-            // Initialisation
             var distances = new Dictionary<int, double>();
             var previous = new Dictionary<int, int>();
             var visited = new HashSet<int>();
@@ -166,7 +165,6 @@ namespace PROJET_PSI
             }
             distances[source] = 0;
 
-            // Algorithme principal
             while (visited.Count < noeuds.Count)
             {
                 int currentNode = -1;
@@ -182,7 +180,6 @@ namespace PROJET_PSI
                 }
 
                 if (currentNode == -1 || currentNode == cible) break;
-
                 visited.Add(currentNode);
 
                 foreach (var edge in noeuds[currentNode].Liens)
@@ -200,7 +197,7 @@ namespace PROJET_PSI
                 }
             }
 
-            // Reconstruction et affichage du chemin
+            // Reconstruction du chemin
             List<int> path = new List<int>();
             int current = cible;
 
@@ -212,47 +209,135 @@ namespace PROJET_PSI
             path.Add(source);
             path.Reverse();
 
-            // Affichage formaté
+            // Dessin du chemin
+            DessinerChemin(path, $"chemin_{source}_vers_{cible}.png");
+
+            // Affichage de l'itinéraire
             Console.WriteLine("\nItinéraire :");
-            Console.WriteLine($"Départ : {noeuds[source].Nom} (Ligne {LignesStations[source]})");
 
             if (path.Count == 1)
             {
-                Console.WriteLine("Vous êtes déjà à la station de destination");
+                Console.WriteLine("Vous êtes déjà à la station de destination.");
                 return 0;
             }
 
-            double totalTime = 0;
+            Console.WriteLine($"Départ de {noeuds[source].Nom} (Ligne {LignesStations[source]})");
+
             string currentLine = LignesStations[source];
-            string previousStation = noeuds[source].Nom;
             double segmentTime = 0;
+            double totalTime = 0;
 
             for (int i = 1; i < path.Count; i++)
             {
                 int from = path[i - 1];
                 int to = path[i];
+
                 var edge = noeuds[from].Liens.First(e => e.Destination.Id == to);
+                string nextLine = LignesStations[to];
                 segmentTime += edge.Poids;
 
-                if (i == path.Count - 1 || LignesStations[to] != currentLine)
+                // Changement de ligne ou fin du chemin
+                bool isLastStep = (i == path.Count - 1);
+                if (nextLine != currentLine || isLastStep)
                 {
-                    Console.WriteLine($"{previousStation} à {noeuds[from].Nom} ({segmentTime} min)");
+                    Console.WriteLine($"Ligne empruntée : {currentLine} ({Math.Round(segmentTime)} min)");
                     totalTime += segmentTime;
 
-                    if (LignesStations[to] != currentLine && i != path.Count - 1)
+                    if (!isLastStep && nextLine != currentLine)
                     {
-                        double transferTime = edge.Poids;
-                        Console.WriteLine($"Correspondance à {noeuds[from].Nom} ({transferTime} min pour rejoindre la ligne {LignesStations[to]})");
-                        totalTime += transferTime;
-                        currentLine = LignesStations[to];
-                        previousStation = noeuds[from].Nom;
+                        Console.WriteLine($"Changement à {noeuds[to].Nom} (+{Math.Round(edge.Poids)} min)");
+                        currentLine = nextLine;
                         segmentTime = 0;
                     }
                 }
             }
 
-            Console.WriteLine($"Arrivée à {noeuds[cible].Nom} en {totalTime} minutes");
+            Console.WriteLine($"Arrivée à {noeuds[path[path.Count - 1]].Nom} en {Math.Round(totalTime)} minutes");
+
             return distances[cible];
+        }
+
+
+        public void DessinerChemin(List<int> chemin, string outputPath)
+        {
+            if (chemin == null || chemin.Count == 0) return;
+
+            const int nodeRadius = 10;
+            const int imageWidth = 1200;
+            const int imageHeight = 800;
+            const int margin = 50;
+
+            using (var bitmap = new Bitmap(imageWidth, imageHeight))
+            using (var graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.Clear(Color.White);
+                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+
+                // Positionnement des nœuds
+                var nodePositions = new Dictionary<int, PointF>();
+                float stepX = (imageWidth - 2 * margin) / (float)(chemin.Count - 1);
+
+                for (int i = 0; i < chemin.Count; i++)
+                {
+                    float x = margin + i * stepX;
+                    float y = imageHeight / 2;
+                    nodePositions[chemin[i]] = new PointF(x, y);
+                }
+
+                // Dessin des liens
+                using (var edgePen = new Pen(Color.Blue, 3))
+                {
+                    for (int i = 0; i < chemin.Count - 1; i++)
+                    {
+                        int from = chemin[i];
+                        int to = chemin[i + 1];
+
+                        graphics.DrawLine(edgePen, nodePositions[from], nodePositions[to]);
+
+                        // Affichage du temps
+                        var lien = noeuds[from].Liens.First(l => l.Destination.Id == to);
+                        PointF middle = new PointF(
+                            (nodePositions[from].X + nodePositions[to].X) / 2,
+                            (nodePositions[from].Y + nodePositions[to].Y) / 2 - 15);
+
+                        graphics.DrawString($"{lien.Poids} min",
+                                         new Font("Arial", 8),
+                                         Brushes.Black,
+                                         middle);
+                    }
+                }
+
+                // Dessin des nœuds
+                using (var nodeBrush = new SolidBrush(Color.Red))
+                using (var textBrush = new SolidBrush(Color.Black))
+                {
+                    foreach (var kvp in nodePositions)
+                    {
+                        graphics.FillEllipse(nodeBrush,
+                                           kvp.Value.X - nodeRadius,
+                                           kvp.Value.Y - nodeRadius,
+                                           nodeRadius * 2,
+                                           nodeRadius * 2);
+
+                        string nom = noeuds[kvp.Key].Nom;
+                        graphics.DrawString(nom,
+                                           new Font("Arial", 8),
+                                           textBrush,
+                                           kvp.Value.X - nodeRadius,
+                                           kvp.Value.Y + nodeRadius + 5);
+
+                        graphics.DrawString(LignesStations[kvp.Key],
+                                          new Font("Arial", 7, FontStyle.Bold),
+                                          Brushes.Green,
+                                          kvp.Value.X - nodeRadius,
+                                          kvp.Value.Y + nodeRadius + 20);
+                    }
+                }
+
+                bitmap.Save(outputPath, ImageFormat.Png);
+                Console.WriteLine($"\nGraphe du chemin généré : {outputPath}");
+            }
         }
 
 
@@ -469,5 +554,7 @@ namespace PROJET_PSI
             float dy = a.Y - b.Y;
             return (float)Math.Sqrt(dx * dx + dy * dy);
         }
+
+        
     }
 }
