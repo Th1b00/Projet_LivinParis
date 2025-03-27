@@ -3,23 +3,22 @@ using System.Collections.Generic;
 using System.IO;
 using System.Data;
 using ExcelDataReader;
-
 using System.Drawing.Imaging;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Linq;
-
+using Antlr.Runtime;
+using static System.Collections.Specialized.BitVector32;
+using static System.Windows.Forms.LinkLabel;
+using System.Runtime.ConstrainedExecution;
 namespace PROJET_PSI
 {
     public class Graphe<T>
     {
         private Dictionary<int, Noeud<T>> noeuds = new Dictionary<int, Noeud<T>>();
-        
-
-        public Dictionary<int, Noeud<T>> Noeuds
-        {
-            get { return noeuds; }
-        }
+        private Dictionary<int, string> lignesStations = new Dictionary<int, string>(); // Dictionnaire pour les lignes des stations
+        public Dictionary<int, Noeud<T>> Noeuds => noeuds;
+        public Dictionary<int, string> LignesStations => lignesStations; // Accesseur pour les lignes des stations
 
         public void AjouterNoeud(int id)
         {
@@ -51,27 +50,69 @@ namespace PROJET_PSI
                         }
                     });
 
-                    var table = result.Tables[1]; // Utiliser la deuxième feuille (celle des stations)
+                    var tableNoeuds = result.Tables[0];
+                    var tableArcs = result.Tables[1];
 
-                    foreach (DataRow row in table.Rows)
+                    var nomToIds = new Dictionary<string, List<int>>();
+
+                    foreach (DataRow row in tableNoeuds.Rows)
                     {
-                        // Lire les informations depuis chaque ligne du fichier Excel
-                        int id = Convert.ToInt32(row["Station Id"]); // Station Id
-                        double? precedent = row["Précédent"] as double?; // Station précédente (optionnelle)
-                        double? suivant = row["Suivant"] as double?; // Station suivante (optionnelle)
-                        double temps = Convert.ToDouble(row["Temps entre 2 stations"]); // Temps entre les stations
+                        string nomStation = row["Libelle station"].ToString().Trim();
+                        int id = Convert.ToInt32(row["ID Station"]);
 
-                        // Ajouter la station (noeud) si elle n'existe pas déjà
+                        if (!nomToIds.ContainsKey(nomStation))
+                            nomToIds[nomStation] = new List<int>();
+
+                        nomToIds[nomStation].Add(id);
                         AjouterNoeud(id);
 
-                        // Ajouter les liens (uniquement si une station est définie)
+                        // Ajout du nom de la station
+                        noeuds[id].Nom = nomStation;
+
+                        string ligne = row["Libelle Line"].ToString().Trim();
+                        lignesStations[id] = ligne;
+                    }
+
+                    foreach (DataRow row in tableArcs.Rows)
+                    {
+                        int id = Convert.ToInt32(row["Station Id"]);
+                        double? precedent = row["Précédent"] as double?;
+                        double? suivant = row["Suivant"] as double?;
+                        double temps = row["Temps entre 2 stations"] != DBNull.Value ? Convert.ToDouble(row["Temps entre 2 stations"]) : 1.0;
+
                         if (precedent.HasValue)
-                        {
-                            AjouterLien((int)precedent, id, temps); // Liaison unidirectionnelle (Précédent -> Station)
-                        }
+                            AjouterLien((int)precedent, id, temps);
+
                         if (suivant.HasValue)
+                            AjouterLien(id, (int)suivant, temps);
+                    }
+
+                    var dejaLie = new HashSet<(int, int)>();
+
+                    foreach (DataRow row in tableArcs.Rows)
+                    {
+                        int id = Convert.ToInt32(row["Station Id"]);
+                        string nomStation = row["Station"].ToString().Trim();
+
+                        if (row["Temps de Changement"] != DBNull.Value)
                         {
-                            AjouterLien(id, (int)suivant, temps); // Liaison unidirectionnelle (Station -> Suivant)
+                            double tempsChangement = Convert.ToDouble(row["Temps de Changement"]);
+
+                            if (nomToIds.ContainsKey(nomStation))
+                            {
+                                foreach (int autreId in nomToIds[nomStation])
+                                {
+                                    if (autreId != id)
+                                    {
+                                        var key = (Math.Min(id, autreId), Math.Max(id, autreId));
+                                        if (!dejaLie.Contains(key))
+                                        {
+                                            AjouterLien(id, autreId, tempsChangement);
+                                            dejaLie.Add(key);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -81,7 +122,7 @@ namespace PROJET_PSI
 
 
         public Dictionary<int, List<(int, double)>> ConstruireListeAdj()
-        {
+            {
             Dictionary<int, List<(int, double)>> listeAdj = new Dictionary<int, List<(int, double)>>();
             foreach (var noeud in noeuds)
             {
@@ -94,8 +135,6 @@ namespace PROJET_PSI
             }
             return listeAdj;
         }
-
-        
 
         public void AfficherListeAdj()
         {
@@ -113,57 +152,115 @@ namespace PROJET_PSI
                 Console.WriteLine();
             }
         }
+
         public double Dijkstra(int source, int cible)
         {
+            // Initialisation
             var distances = new Dictionary<int, double>();
+            var previous = new Dictionary<int, int>();
             var visited = new HashSet<int>();
 
-            // Initialisation des distances à l'infini, sauf la source
-            foreach (var noeud in noeuds.Keys)
-                distances[noeud] = double.PositiveInfinity;
-
+            foreach (var node in noeuds.Keys)
+            {
+                distances[node] = double.PositiveInfinity;
+            }
             distances[source] = 0;
 
+            // Algorithme principal
             while (visited.Count < noeuds.Count)
             {
-                // Trouver le sommet non visité avec la plus petite distance
-                int noeudCourant = -1;
+                int currentNode = -1;
                 double minDistance = double.PositiveInfinity;
 
-                foreach (var noeud in noeuds.Keys)
+                foreach (var node in noeuds.Keys)
                 {
-                    if (!visited.Contains(noeud) && distances[noeud] < minDistance)
+                    if (!visited.Contains(node) && distances[node] < minDistance)
                     {
-                        minDistance = distances[noeud];
-                        noeudCourant = noeud;
+                        minDistance = distances[node];
+                        currentNode = node;
                     }
                 }
 
-                if (noeudCourant == -1) break; // Tous les sommets atteignables ont été traités
-                if (noeudCourant == cible) return distances[cible]; // On a atteint la cible, on s'arrête
+                if (currentNode == -1 || currentNode == cible) break;
 
-                visited.Add(noeudCourant);
+                visited.Add(currentNode);
 
-                // Mise à jour des distances des voisins
-                foreach (var lien in noeuds[noeudCourant].Liens)
+                foreach (var edge in noeuds[currentNode].Liens)
                 {
-                    if (!visited.Contains(lien.Destination.Id))
+                    int neighbor = edge.Destination.Id;
+                    if (!visited.Contains(neighbor))
                     {
-                        double nouvelleDistance = distances[noeudCourant] + lien.Poids;
-                        if (nouvelleDistance < distances[lien.Destination.Id])
+                        double newDistance = distances[currentNode] + edge.Poids;
+                        if (newDistance < distances[neighbor])
                         {
-                            distances[lien.Destination.Id] = nouvelleDistance;
+                            distances[neighbor] = newDistance;
+                            previous[neighbor] = currentNode;
                         }
                     }
                 }
             }
 
-            return double.PositiveInfinity; // Retourne ∞ si aucun chemin n'existe entre source et cible
+            // Reconstruction et affichage du chemin
+            List<int> path = new List<int>();
+            int current = cible;
+
+            while (current != source && previous.ContainsKey(current))
+            {
+                path.Add(current);
+                current = previous[current];
+            }
+            path.Add(source);
+            path.Reverse();
+
+            // Affichage formaté
+            Console.WriteLine("\nItinéraire :");
+            Console.WriteLine($"Départ : {noeuds[source].Nom} (Ligne {LignesStations[source]})");
+
+            if (path.Count == 1)
+            {
+                Console.WriteLine("Vous êtes déjà à la station de destination");
+                return 0;
+            }
+
+            double totalTime = 0;
+            string currentLine = LignesStations[source];
+            string previousStation = noeuds[source].Nom;
+            double segmentTime = 0;
+
+            for (int i = 1; i < path.Count; i++)
+            {
+                int from = path[i - 1];
+                int to = path[i];
+                var edge = noeuds[from].Liens.First(e => e.Destination.Id == to);
+                segmentTime += edge.Poids;
+
+                if (i == path.Count - 1 || LignesStations[to] != currentLine)
+                {
+                    Console.WriteLine($"{previousStation} à {noeuds[from].Nom} ({segmentTime} min)");
+                    totalTime += segmentTime;
+
+                    if (LignesStations[to] != currentLine && i != path.Count - 1)
+                    {
+                        double transferTime = edge.Poids;
+                        Console.WriteLine($"Correspondance à {noeuds[from].Nom} ({transferTime} min pour rejoindre la ligne {LignesStations[to]})");
+                        totalTime += transferTime;
+                        currentLine = LignesStations[to];
+                        previousStation = noeuds[from].Nom;
+                        segmentTime = 0;
+                    }
+                }
+            }
+
+            Console.WriteLine($"Arrivée à {noeuds[cible].Nom} en {totalTime} minutes");
+            return distances[cible];
         }
+
+
+
 
         public double BellmanFord(int source, int cible)
         {
-            Dictionary<int, double> distances = new Dictionary<int, double>();
+            var distances = new Dictionary<int, double>();
 
             // Initialisation : toutes les distances à l'infini, sauf la source à 0
             foreach (var noeud in noeuds.Keys)
@@ -192,53 +289,66 @@ namespace PROJET_PSI
 
         public double FloydWarshall(int source, int cible)
         {
-            // Trouver l'index maximum dans le graphe pour éviter les dépassements de tableau
-            int maxIndex = noeuds.Keys.Max() + 1;
-            double[,] dist = new double[maxIndex, maxIndex];
+            // Étape 1 : Créer une table de correspondance ID ↔ index
+            var idList = noeuds.Keys.ToList();
+            var idToIndex = new Dictionary<int, int>();
+            var indexToId = new Dictionary<int, int>();
 
-            // Initialisation de la matrice
-            for (int i = 0; i < maxIndex; i++)
+            for (int i = 0; i < idList.Count; i++)
             {
-                for (int j = 0; j < maxIndex; j++)
+                idToIndex[idList[i]] = i;
+                indexToId[i] = idList[i];
+            }
+
+            int n = idList.Count;
+            double[,] dist = new double[n, n];
+
+            // Étape 2 : Initialiser la matrice
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < n; j++)
                 {
-                    if (i == j) dist[i, j] = 0;
-                    else dist[i, j] = double.PositiveInfinity;
+                    dist[i, j] = (i == j) ? 0 : -1; // -1 = pas de lien
                 }
             }
 
-            // Remplissage de la matrice avec les distances existantes
+            // Étape 3 : Remplir la matrice avec les poids du graphe
             foreach (var noeud in noeuds)
             {
+                int i = idToIndex[noeud.Key];
                 foreach (var lien in noeud.Value.Liens)
                 {
-                    dist[noeud.Key, lien.Destination.Id] = lien.Poids;
+                    int j = idToIndex[lien.Destination.Id];
+                    dist[i, j] = lien.Poids;
                 }
             }
 
-            // Algorithme de Floyd-Warshall
-            for (int k = 0; k < maxIndex; k++)
+            // Étape 4 : Algorithme Floyd-Warshall
+            for (int k = 0; k < n; k++)
             {
-                for (int i = 0; i < maxIndex; i++)
+                for (int i = 0; i < n; i++)
                 {
-                    for (int j = 0; j < maxIndex; j++)
+                    for (int j = 0; j < n; j++)
                     {
-                        if (dist[i, k] != double.PositiveInfinity && dist[k, j] != double.PositiveInfinity)
+                        if (dist[i, k] != -1 && dist[k, j] != -1)
                         {
-                            dist[i, j] = Math.Min(dist[i, j], dist[i, k] + dist[k, j]);
+                            double nouveau = dist[i, k] + dist[k, j];
+                            if (dist[i, j] == -1 || nouveau < dist[i, j])
+                            {
+                                dist[i, j] = nouveau;
+                            }
                         }
                     }
                 }
             }
 
-            // Vérification que source et cible existent dans le graphe
-            if (!noeuds.ContainsKey(source) || !noeuds.ContainsKey(cible))
-            {
-                return double.PositiveInfinity; // Retourne une valeur infinie si les sommets n'existent pas
-            }
+            // Étape 5 : Traduire les ID d'entrée en indices
+            if (!idToIndex.ContainsKey(source) || !idToIndex.ContainsKey(cible))
+                return -1; // Source ou cible inexistante
 
-            return dist[source, cible]; // Retourne la distance minimale
+            double resultat = dist[idToIndex[source], idToIndex[cible]];
+            return resultat == -1 ? -1 : resultat;
         }
-
 
         public void DessinerGraphe(string outputPath = "graphe.png")
         {
@@ -359,6 +469,5 @@ namespace PROJET_PSI
             float dy = a.Y - b.Y;
             return (float)Math.Sqrt(dx * dx + dy * dy);
         }
-
     }
 }
