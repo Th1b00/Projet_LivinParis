@@ -11,8 +11,6 @@ namespace PROJET_PSI
 
             var graphe = new Graphe<string>();
 
-
-       
             
             graphe.ChargerGraphe("metro.xlsx");
 
