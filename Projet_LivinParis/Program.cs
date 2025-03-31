@@ -37,7 +37,7 @@ namespace PROJET_PSI
             double dijkstraResult = graphe.Dijkstra(a, b);
             Console.WriteLine("Dijkstra       : " + dijkstraResult + " minutes");
             Console.WriteLine("Bellman-Ford   : " + graphe.BellmanFord(a, b) + " minutes");
-            Console.WriteLine("Floyd-Warshall : " + graphe.FloydWarshall(a, b) + " minutes");
+            Console.WriteLine("Floyd-Warshall: " + graphe.FloydWarshall(a, b) + " minutes");
 
             // Génération des graphes
             Console.WriteLine("\nGénération du dessin du graphe complet...");
