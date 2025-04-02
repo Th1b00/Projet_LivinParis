@@ -16,25 +16,56 @@ namespace PROJET_PSI
     public class Graphe<T>
     {
         private Dictionary<int, Noeud<T>> noeuds = new Dictionary<int, Noeud<T>>();
-        private Dictionary<int, string> lignesStations = new Dictionary<int, string>(); // Dictionnaire pour les lignes des stations
-        public Dictionary<int, Noeud<T>> Noeuds => noeuds;
-        public Dictionary<int, string> LignesStations => lignesStations; // Accesseur pour les lignes des stations
+        private Dictionary<int, string> lignesStations = new Dictionary<int, string>();
+
+        public Dictionary<int, Noeud<T>> Noeuds
+        {
+            get { return noeuds; }
+            set { noeuds = value; }
+        }
+
+        public Dictionary<int, string> LignesStations
+        {
+            get { return lignesStations; }
+            set { lignesStations = value; }
+        }
 
         public void AjouterNoeud(int id)
         {
-            if (!noeuds.ContainsKey(id))
+            if (noeuds.ContainsKey(id) != true)
             {
                 noeuds[id] = new Noeud<T>(id);
             }
+        }
+
+        private bool ExisteLienEntre(int source, int destination)
+        {
+            foreach (var lien in noeuds[source].Liens)
+            {
+                if (lien.Destination.Id == destination)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public void AjouterLien(int id1, int id2, double poids = 1.0)
         {
             AjouterNoeud(id1);
             AjouterNoeud(id2);
-            noeuds[id1].Liens.Add(new Lien<T>(noeuds[id2], poids));
-            noeuds[id2].Liens.Add(new Lien<T>(noeuds[id1], poids));
+
+            if (ExisteLienEntre(id1, id2) != true)
+            {
+                noeuds[id1].Liens.Add(new Lien<T>(noeuds[id2], poids));
+            }
+
+            if (ExisteLienEntre(id2, id1) != true)
+            {
+                noeuds[id2].Liens.Add(new Lien<T>(noeuds[id1], poids));
+            }
         }
+
 
         public void ChargerGraphe(string fichier)
         {
@@ -53,17 +84,21 @@ namespace PROJET_PSI
                     var tableNoeuds = result.Tables[0];
                     var tableArcs = result.Tables[1];
 
-                    var nomToIds = new Dictionary<string, List<int>>();
+                    var idParStation = new Dictionary<string, List<int>>();
+
 
                     foreach (DataRow row in tableNoeuds.Rows)
                     {
                         string nomStation = row["Libelle station"].ToString().Trim();
                         int id = Convert.ToInt32(row["ID Station"]);
 
-                        if (!nomToIds.ContainsKey(nomStation))
-                            nomToIds[nomStation] = new List<int>();
+                        if (idParStation.ContainsKey(nomStation) != true)
+                        {
+                            idParStation[nomStation] = new List<int>();
+                        }
 
-                        nomToIds[nomStation].Add(id);
+
+                        idParStation[nomStation].Add(id);
                         AjouterNoeud(id);
 
                         // Ajout du nom de la station
@@ -76,18 +111,39 @@ namespace PROJET_PSI
                     foreach (DataRow row in tableArcs.Rows)
                     {
                         int id = Convert.ToInt32(row["Station Id"]);
-                        double? precedent = row["Précédent"] as double?;
-                        double? suivant = row["Suivant"] as double?;
-                        double temps = row["Temps entre 2 stations"] != DBNull.Value ? Convert.ToDouble(row["Temps entre 2 stations"]) : 1.0;
+                        double precedent = -1;
+                        double suivant = -1;
+                        double temps = 1.0;
 
-                        if (precedent.HasValue)
+                        if (row["Précédent"] != DBNull.Value)
+                        {
+                            precedent = Convert.ToDouble(row["Précédent"]);
+                        }
+
+                        if (row["Suivant"] != DBNull.Value)
+                        {
+                            suivant = Convert.ToDouble(row["Suivant"]);
+                        }
+
+                        if (row["Temps entre 2 stations"] != DBNull.Value)
+                        {
+                            temps = Convert.ToDouble(row["Temps entre 2 stations"]);
+                        }
+
+                        if (precedent != -1)
+                        {
                             AjouterLien((int)precedent, id, temps);
+                        }
 
-                        if (suivant.HasValue)
+                        if (suivant != -1)
+                        {
                             AjouterLien(id, (int)suivant, temps);
+                        }
                     }
 
                     var dejaLie = new HashSet<(int, int)>();
+
+                    var dejaLiee = new HashSet<(int, int)>();
 
                     foreach (DataRow row in tableArcs.Rows)
                     {
@@ -98,23 +154,24 @@ namespace PROJET_PSI
                         {
                             double tempsChangement = Convert.ToDouble(row["Temps de Changement"]);
 
-                            if (nomToIds.ContainsKey(nomStation))
+                            if (idParStation.ContainsKey(nomStation) != false)
                             {
-                                foreach (int autreId in nomToIds[nomStation])
+                                foreach (int autreId in idParStation[nomStation])
                                 {
                                     if (autreId != id)
                                     {
-                                        var key = (Math.Min(id, autreId), Math.Max(id, autreId));
-                                        if (!dejaLie.Contains(key))
+                                        var cle = (Math.Min(id, autreId), Math.Max(id, autreId));
+                                        if (dejaLiee.Contains(cle) != true)
                                         {
                                             AjouterLien(id, autreId, tempsChangement);
-                                            dejaLie.Add(key);
+                                            dejaLiee.Add(cle);
                                         }
                                     }
                                 }
                             }
                         }
                     }
+
                 }
             }
         }
@@ -122,19 +179,29 @@ namespace PROJET_PSI
 
 
         public Dictionary<int, List<(int, double)>> ConstruireListeAdj()
-            {
+        {
             Dictionary<int, List<(int, double)>> listeAdj = new Dictionary<int, List<(int, double)>>();
+
             foreach (var noeud in noeuds)
             {
                 listeAdj[noeud.Key] = new List<(int, double)>();
+
                 foreach (var lien in noeud.Value.Liens)
                 {
                     listeAdj[noeud.Key].Add((lien.Destination.Id, lien.Poids));
                 }
-                listeAdj[noeud.Key].Sort((x, y) => x.Item1.CompareTo(y.Item1));
+
+                listeAdj[noeud.Key].Sort(ComparerVoisinsParId);
             }
+
             return listeAdj;
         }
+
+        private int ComparerVoisinsParId((int, double) x, (int, double) y)
+        {
+            return x.Item1.CompareTo(y.Item1);
+        }
+
 
         public void AfficherListeAdj()
         {
@@ -147,115 +214,121 @@ namespace PROJET_PSI
                 Console.Write(key + ": ");
                 foreach (var lien in listeAdj[key])
                 {
-                    Console.Write($"({lien.Item1}, {lien.Item2}) ");
+                    Console.Write("(" + lien.Item1 + ", " + lien.Item2 + ") ");
                 }
                 Console.WriteLine();
             }
         }
 
-        public double Dijkstra(int source, int cible)
+        public double Dijkstra(int depart, int arrivee)
         {
             var distances = new Dictionary<int, double>();
-            var previous = new Dictionary<int, int>();
-            var visited = new HashSet<int>();
+            var precedent = new Dictionary<int, int>();
+            var visites = new HashSet<int>();
 
-            foreach (var node in noeuds.Keys)
+            foreach (var identifiant in noeuds.Keys)
             {
-                distances[node] = double.PositiveInfinity;
+                distances[identifiant] = double.PositiveInfinity;
             }
-            distances[source] = 0;
+            distances[depart] = 0;
 
-            while (visited.Count < noeuds.Count)
+            while (visites.Count < noeuds.Count)
             {
-                int currentNode = -1;
-                double minDistance = double.PositiveInfinity;
+                int noeudActuel = -1;
+                double distanceMinimale = double.PositiveInfinity;
 
-                foreach (var node in noeuds.Keys)
+                foreach (var identifiant in noeuds.Keys)
                 {
-                    if (!visited.Contains(node) && distances[node] < minDistance)
+                    if (visites.Contains(identifiant) != true && distances[identifiant] < distanceMinimale)
                     {
-                        minDistance = distances[node];
-                        currentNode = node;
+                        distanceMinimale = distances[identifiant];
+                        noeudActuel = identifiant;
                     }
                 }
 
-                if (currentNode == -1 || currentNode == cible) break;
-                visited.Add(currentNode);
-
-                foreach (var edge in noeuds[currentNode].Liens)
+                if (noeudActuel == -1 || noeudActuel == arrivee)
                 {
-                    int neighbor = edge.Destination.Id;
-                    if (!visited.Contains(neighbor))
+                    break;
+                }
+
+                visites.Add(noeudActuel);
+
+                foreach (var lien in noeuds[noeudActuel].Liens)
+                {
+                    int voisin = lien.Destination.Id;
+                    if (visites.Contains(voisin) != true)
                     {
-                        double newDistance = distances[currentNode] + edge.Poids;
-                        if (newDistance < distances[neighbor])
+                        double nouvelleDistance = distances[noeudActuel] + lien.Poids;
+                        if (nouvelleDistance < distances[voisin])
                         {
-                            distances[neighbor] = newDistance;
-                            previous[neighbor] = currentNode;
+                            distances[voisin] = nouvelleDistance;
+                            precedent[voisin] = noeudActuel;
                         }
                     }
                 }
             }
 
             // Reconstruction du chemin
-            List<int> path = new List<int>();
-            int current = cible;
+            List<int> chemin = new List<int>();
+            int actuel = arrivee;
 
-            while (current != source && previous.ContainsKey(current))
+            while (actuel != depart && precedent.ContainsKey(actuel))
             {
-                path.Add(current);
-                current = previous[current];
+                chemin.Add(actuel);
+                actuel = precedent[actuel];
             }
-            path.Add(source);
-            path.Reverse();
 
-            // Dessin du chemin
-            DessinerChemin(path, $"chemin_{source}_vers_{cible}.png");
+            chemin.Add(depart);
+            chemin.Reverse();
 
-            // Affichage de l'itinéraire
+            string cheminImage = "chemin_" + depart + "_vers_" + arrivee + ".png";
+            DessinerChemin(chemin, cheminImage);
+
+            // Affichage console
             Console.WriteLine("\nItinéraire :");
 
-            if (path.Count == 1)
+            if (chemin.Count == 1)
             {
                 Console.WriteLine("Vous êtes déjà à la station de destination.");
                 return 0;
             }
 
-            Console.WriteLine($"Départ de {noeuds[source].Nom} (Ligne {LignesStations[source]})");
+            Console.WriteLine("Départ de " + noeuds[depart].Nom + " (Ligne " + LignesStations[depart] + ")");
 
-            string currentLine = LignesStations[source];
-            double segmentTime = 0;
-            double totalTime = 0;
+            string ligneActuelle = LignesStations[depart];
+            double tempsSegment = 0;
+            double tempsTotal = 0;
 
-            for (int i = 1; i < path.Count; i++)
+            for (int i = 1; i < chemin.Count; i++)
             {
-                int from = path[i - 1];
-                int to = path[i];
+                int depuis = chemin[i - 1];
+                int vers = chemin[i];
 
-                var edge = noeuds[from].Liens.First(e => e.Destination.Id == to);
-                string nextLine = LignesStations[to];
-                segmentTime += edge.Poids;
+                var lien = noeuds[depuis].Liens.First(e => e.Destination.Id == vers);
+                string ligneSuivante = LignesStations[vers];
+                tempsSegment += lien.Poids;
 
-                // Changement de ligne ou fin du chemin
-                bool isLastStep = (i == path.Count - 1);
-                if (nextLine != currentLine || isLastStep)
+                bool estDerniereEtape = (i == chemin.Count - 1);
+                if (ligneSuivante != ligneActuelle || estDerniereEtape)
                 {
-                    Console.WriteLine($"Ligne empruntée : {currentLine} ({Math.Round(segmentTime)} min)");
-                    totalTime += segmentTime;
+                    Console.WriteLine("Ligne empruntée : " + ligneActuelle + " (" + Math.Round(tempsSegment) + " min)");
+                    tempsTotal += tempsSegment;
 
-                    if (!isLastStep && nextLine != currentLine)
+                    if (estDerniereEtape != true && ligneSuivante != ligneActuelle)
                     {
-                        Console.WriteLine($"Changement à {noeuds[to].Nom} (+{Math.Round(edge.Poids)} min)");
-                        currentLine = nextLine;
-                        segmentTime = 0;
+                        Console.WriteLine("Changement à " + noeuds[vers].Nom + " (+" + Math.Round(lien.Poids) + " min)");
+                        ligneActuelle = ligneSuivante;
+                        tempsSegment = 0;
                     }
                 }
             }
 
-            Console.WriteLine($"Arrivée à {noeuds[path[path.Count - 1]].Nom} en {Math.Round(totalTime)} minutes");
+            Console.WriteLine("Arrivée à " + noeuds[chemin[chemin.Count - 1]].Nom + " en " + Math.Round(tempsTotal) + " minutes");
 
-            return distances[cible];
+            return distances[arrivee];
         }
+
+
 
 
         public void DessinerChemin(List<int> chemin, string outputPath)
@@ -428,11 +501,22 @@ namespace PROJET_PSI
             }
 
             // Étape 5 : Traduire les ID d'entrée en indices
-            if (!idToIndex.ContainsKey(source) || !idToIndex.ContainsKey(cible))
-                return -1; // Source ou cible inexistante
+            if (idToIndex.ContainsKey(source) != true || idToIndex.ContainsKey(cible) != true)
+            {
+                return -1;
+            }
 
             double resultat = dist[idToIndex[source], idToIndex[cible]];
-            return resultat == -1 ? -1 : resultat;
+
+            if (resultat == -1)
+            {
+                return -1;
+            }
+            else
+            {
+                return resultat;
+            }
+
         }
 
         public void DessinerGraphe(string outputPath = "graphe.png")
@@ -545,7 +629,7 @@ namespace PROJET_PSI
                 bitmap.Save(outputPath, ImageFormat.Png);
             }
 
-            Console.WriteLine($"Graphe généré dans {outputPath}");
+            Console.WriteLine("Graphe généré dans " + outputPath + ")");
         }
 
         private float Distance(PointF a, PointF b)
@@ -555,6 +639,50 @@ namespace PROJET_PSI
             return (float)Math.Sqrt(dx * dx + dy * dy);
         }
 
-        
+        public void AfficherCheminDansFenetre(string cheminImage)
+        {
+            if (File.Exists(cheminImage) != true)
+            {
+                Console.WriteLine("Le fichier image '" + cheminImage + "' est introuvable.");
+                return;
+            }
+
+            Form fenetre = new Form
+            {
+                Text = "Itinéraire du chemin le plus court",
+                Width = 1300,
+                Height = 900,
+                StartPosition = FormStartPosition.CenterScreen
+            };
+
+            PictureBox imageBox = new PictureBox
+            {
+                Image = Image.FromFile(cheminImage),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Dock = DockStyle.Fill
+            };
+
+            fenetre.Controls.Add(imageBox);
+
+            System.Windows.Forms.Application.Run(fenetre);
+        }
+
+        public int LireSommetValide(string message)
+        {
+            int valeur = -1;
+            while (valeur < 1 || valeur > 333)
+            {
+                Console.Write(message);
+                string saisie = Console.ReadLine();
+                if (int.TryParse(saisie, out valeur) != true || valeur < 1 || valeur > 333)
+                {
+                    Console.WriteLine("Sommet invalide. Veuillez entrer un ID compris entre 1 et 333.");
+                    valeur = -1;
+                }
+            }
+            return valeur;
+        }
+
+
     }
 }
