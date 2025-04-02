@@ -16,7 +16,12 @@ namespace PROJET_PSI
     public class Graphe<T>
     {
         private Dictionary<int, Noeud<T>> noeuds = new Dictionary<int, Noeud<T>>();
-        private Dictionary<int, string> lignesStations = new Dictionary<int, string>(); // Dictionnaire pour les lignes des stations
+
+        private Dictionary<int, string> lignesStations = new Dictionary<int, string>();
+
+
+        
+
         public Dictionary<int, Noeud<T>> Noeuds
         {
             get { return noeuds; }
@@ -26,7 +31,9 @@ namespace PROJET_PSI
         public Dictionary<int, string> LignesStations
         {
             get { return lignesStations; }
+
             set {  lignesStations = value; }    
+
         }
 
         public void AjouterNoeud(int id)
@@ -38,13 +45,35 @@ namespace PROJET_PSI
         }
 
 
+        private bool ExisteLienEntre(int source, int destination)
+        {
+            foreach (var lien in noeuds[source].Liens)
+            {
+                if (lien.Destination.Id == destination)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+
         public void AjouterLien(int id1, int id2, double poids = 1.0)
         {
             AjouterNoeud(id1);
             AjouterNoeud(id2);
-            noeuds[id1].Liens.Add(new Lien<T>(noeuds[id2], poids));
-            noeuds[id2].Liens.Add(new Lien<T>(noeuds[id1], poids));
+
+            if (ExisteLienEntre(id1, id2) != true)
+            {
+                noeuds[id1].Liens.Add(new Lien<T>(noeuds[id2], poids));
+            }
+
+            if (ExisteLienEntre(id2, id1) != true)
+            {
+                noeuds[id2].Liens.Add(new Lien<T>(noeuds[id1], poids));
+            }
         }
+
 
         public void ChargerGraphe(string fichier)
         {
@@ -230,7 +259,9 @@ namespace PROJET_PSI
                     break;
                 }
 
+
                 visites.Add(noeudActuel);
+
 
                 foreach (var lien in noeuds[noeudActuel].Liens)
                 {
@@ -257,13 +288,15 @@ namespace PROJET_PSI
                 actuel = precedent[actuel];
             }
 
+
             chemin.Add(depart);
             chemin.Reverse();
 
-            // Dessin du chemin
-            DessinerChemin(chemin, "chemin_" + depart + "_vers_" + arrivee + ".png");
 
-            // Affichage de l'itinéraire
+            string cheminImage = "chemin_" + depart + "_vers_" + arrivee + ".png";
+            DessinerChemin(chemin, cheminImage);
+
+            // Affichage console
             Console.WriteLine("\nItinéraire :");
 
             if (chemin.Count == 1)
@@ -306,6 +339,7 @@ namespace PROJET_PSI
 
             return distances[arrivee];
         }
+
 
 
 
@@ -481,7 +515,9 @@ namespace PROJET_PSI
             // Étape 5 : Traduire les ID d'entrée en indices
             if (idToIndex.ContainsKey(source) != true || idToIndex.ContainsKey(cible) != true)
             {
-                return -1; 
+
+                return -1;
+
             }
 
             double resultat = dist[idToIndex[source], idToIndex[cible]];
@@ -607,7 +643,9 @@ namespace PROJET_PSI
                 bitmap.Save(outputPath, ImageFormat.Png);
             }
 
-            Console.WriteLine("Graphe généré dans "+outputPath+")");
+
+            Console.WriteLine("Graphe généré dans " + outputPath + ")");
+
         }
 
         private float Distance(PointF a, PointF b)
@@ -617,6 +655,50 @@ namespace PROJET_PSI
             return (float)Math.Sqrt(dx * dx + dy * dy);
         }
 
-        
+        public void AfficherCheminDansFenetre(string cheminImage)
+        {
+            if (File.Exists(cheminImage) != true)
+            {
+                Console.WriteLine("Le fichier image '" + cheminImage + "' est introuvable.");
+                return;
+            }
+
+            Form fenetre = new Form
+            {
+                Text = "Itinéraire du chemin le plus court",
+                Width = 1300,
+                Height = 900,
+                StartPosition = FormStartPosition.CenterScreen
+            };
+
+            PictureBox imageBox = new PictureBox
+            {
+                Image = Image.FromFile(cheminImage),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                Dock = DockStyle.Fill
+            };
+
+            fenetre.Controls.Add(imageBox);
+
+            System.Windows.Forms.Application.Run(fenetre);
+        }
+
+        public int LireSommetValide(string message)
+        {
+            int valeur = -1;
+            while (valeur < 1 || valeur > 333)
+            {
+                Console.Write(message);
+                string saisie = Console.ReadLine();
+                if (int.TryParse(saisie, out valeur) != true || valeur < 1 || valeur > 333)
+                {
+                    Console.WriteLine("Sommet invalide. Veuillez entrer un ID compris entre 1 et 333.");
+                    valeur = -1;
+                }
+            }
+            return valeur;
+        }
+
+
     }
 }
