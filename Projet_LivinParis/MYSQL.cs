@@ -1,9 +1,9 @@
 ﻿using System;
 using MySql.Data.MySqlClient;
 
-namespace Projet_LivinParis
+namespace PROJET_PSI
 {
-    internal class MYSQL
+    public class MYSQL
     {
         static string connectionString = "Server=localhost;Database=LivinParis_PSI;Uid=root;Pwd=Tfmi0912;";
 
