@@ -16,7 +16,11 @@ namespace PROJET_PSI
     public class Graphe<T>
     {
         private Dictionary<int, Noeud<T>> noeuds = new Dictionary<int, Noeud<T>>();
+
         private Dictionary<int, string> lignesStations = new Dictionary<int, string>();
+
+
+        
 
         public Dictionary<int, Noeud<T>> Noeuds
         {
@@ -27,7 +31,9 @@ namespace PROJET_PSI
         public Dictionary<int, string> LignesStations
         {
             get { return lignesStations; }
-            set { lignesStations = value; }
+
+            set {  lignesStations = value; }    
+
         }
 
         public void AjouterNoeud(int id)
@@ -37,6 +43,7 @@ namespace PROJET_PSI
                 noeuds[id] = new Noeud<T>(id);
             }
         }
+
 
         private bool ExisteLienEntre(int source, int destination)
         {
@@ -49,6 +56,7 @@ namespace PROJET_PSI
             }
             return false;
         }
+
 
         public void AjouterLien(int id1, int id2, double poids = 1.0)
         {
@@ -251,7 +259,9 @@ namespace PROJET_PSI
                     break;
                 }
 
+
                 visites.Add(noeudActuel);
+
 
                 foreach (var lien in noeuds[noeudActuel].Liens)
                 {
@@ -278,8 +288,10 @@ namespace PROJET_PSI
                 actuel = precedent[actuel];
             }
 
+
             chemin.Add(depart);
             chemin.Reverse();
+
 
             string cheminImage = "chemin_" + depart + "_vers_" + arrivee + ".png";
             DessinerChemin(chemin, cheminImage);
@@ -503,7 +515,9 @@ namespace PROJET_PSI
             // Étape 5 : Traduire les ID d'entrée en indices
             if (idToIndex.ContainsKey(source) != true || idToIndex.ContainsKey(cible) != true)
             {
+
                 return -1;
+
             }
 
             double resultat = dist[idToIndex[source], idToIndex[cible]];
@@ -629,7 +643,9 @@ namespace PROJET_PSI
                 bitmap.Save(outputPath, ImageFormat.Png);
             }
 
+
             Console.WriteLine("Graphe généré dans " + outputPath + ")");
+
         }
 
         private float Distance(PointF a, PointF b)
