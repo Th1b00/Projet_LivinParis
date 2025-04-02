@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Data;
@@ -16,11 +16,7 @@ namespace PROJET_PSI
     public class Graphe<T>
     {
         private Dictionary<int, Noeud<T>> noeuds = new Dictionary<int, Noeud<T>>();
-
         private Dictionary<int, string> lignesStations = new Dictionary<int, string>();
-
-
-        
 
         public Dictionary<int, Noeud<T>> Noeuds
         {
@@ -31,9 +27,7 @@ namespace PROJET_PSI
         public Dictionary<int, string> LignesStations
         {
             get { return lignesStations; }
-
-            set {  lignesStations = value; }    
-
+            set { lignesStations = value; }
         }
 
         public void AjouterNoeud(int id)
@@ -43,7 +37,6 @@ namespace PROJET_PSI
                 noeuds[id] = new Noeud<T>(id);
             }
         }
-
 
         private bool ExisteLienEntre(int source, int destination)
         {
@@ -56,7 +49,6 @@ namespace PROJET_PSI
             }
             return false;
         }
-
 
         public void AjouterLien(int id1, int id2, double poids = 1.0)
         {
@@ -259,9 +251,7 @@ namespace PROJET_PSI
                     break;
                 }
 
-
                 visites.Add(noeudActuel);
-
 
                 foreach (var lien in noeuds[noeudActuel].Liens)
                 {
@@ -288,10 +278,8 @@ namespace PROJET_PSI
                 actuel = precedent[actuel];
             }
 
-
             chemin.Add(depart);
             chemin.Reverse();
-
 
             string cheminImage = "chemin_" + depart + "_vers_" + arrivee + ".png";
             DessinerChemin(chemin, cheminImage);
@@ -515,9 +503,7 @@ namespace PROJET_PSI
             // Étape 5 : Traduire les ID d'entrée en indices
             if (idToIndex.ContainsKey(source) != true || idToIndex.ContainsKey(cible) != true)
             {
-
                 return -1;
-
             }
 
             double resultat = dist[idToIndex[source], idToIndex[cible]];
@@ -643,9 +629,7 @@ namespace PROJET_PSI
                 bitmap.Save(outputPath, ImageFormat.Png);
             }
 
-
             Console.WriteLine("Graphe généré dans " + outputPath + ")");
-
         }
 
         private float Distance(PointF a, PointF b)
@@ -686,17 +670,21 @@ namespace PROJET_PSI
         public int LireSommetValide(string message)
         {
             int valeur = -1;
-            while (valeur < 1 || valeur > 333)
+            string saisie = "";
+            while (valeur < 1 || valeur > 332)
             {
                 Console.Write(message);
-                string saisie = Console.ReadLine();
-                if (int.TryParse(saisie, out valeur) != true || valeur < 1 || valeur > 333)
+                saisie = Console.ReadLine();
+                valeur = Convert.ToInt32(saisie);
+
+                if (valeur < 1 || valeur > 332)
                 {
-                    Console.WriteLine("Sommet invalide. Veuillez entrer un ID compris entre 1 et 333.");
-                    valeur = -1;
+                    Console.WriteLine("Sommet invalide. Veuillez entrer un ID compris entre 1 et 332.");
                 }
+
             }
             return valeur;
+
         }
 
 
