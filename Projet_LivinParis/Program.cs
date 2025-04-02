@@ -5,10 +5,6 @@ using System.Linq;
 
 namespace PROJET_PSI
 {
-    using System;
-
-    namespace Projet_LivinParis
-    {
         public class Program
         {
             static void Main(string[] args)
@@ -76,9 +72,8 @@ namespace PROJET_PSI
                             Console.WriteLine("Choix invalide. Appuyez sur une touche pour réessayer.");
                             Console.ReadKey();
                             break;
-                    }
                 }
             }
-        }
+         }
     }
 }
