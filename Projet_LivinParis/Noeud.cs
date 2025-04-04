@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace PROJET_PSI
@@ -8,6 +8,8 @@ namespace PROJET_PSI
         private int id;
         private string nom;
         private List<Lien<T>> liens = new List<Lien<T>>();
+        private float x;
+        private float y;
 
         public Noeud(int id)
         {
@@ -30,6 +32,16 @@ namespace PROJET_PSI
         {
             get { return liens; }
             set { liens = value; }
+        }
+        public float X
+        {
+            get { return x; }
+            set { x = value; }
+        }
+        public float Y
+        {
+            get { return y; }
+            set { y = value; }
         }
     }
 }
