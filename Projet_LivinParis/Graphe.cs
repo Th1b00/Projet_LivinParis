@@ -11,6 +11,8 @@ using Antlr.Runtime;
 using static System.Collections.Specialized.BitVector32;
 using static System.Windows.Forms.LinkLabel;
 using System.Runtime.ConstrainedExecution;
+using System.Drawing.Drawing2D;
+
 namespace PROJET_PSI
 {
     public class Graphe<T>
@@ -70,155 +72,103 @@ namespace PROJET_PSI
         public void ChargerGraphe(string fichier)
         {
             using (var stream = File.Open(fichier, FileMode.Open, FileAccess.Read))
+            using (var reader = ExcelReaderFactory.CreateReader(stream))
             {
-                using (var reader = ExcelReaderFactory.CreateReader(stream))
+                var result = reader.AsDataSet(new ExcelDataSetConfiguration()
                 {
-                    var result = reader.AsDataSet(new ExcelDataSetConfiguration()
+                    ConfigureDataTable = _ => new ExcelDataTableConfiguration()
                     {
-                        ConfigureDataTable = _ => new ExcelDataTableConfiguration()
-                        {
-                            UseHeaderRow = true
-                        }
-                    });
-
-                    var tableNoeuds = result.Tables[0];
-                    var tableArcs = result.Tables[1];
-
-                    var idParStation = new Dictionary<string, List<int>>();
-
-
-                    foreach (DataRow row in tableNoeuds.Rows)
-                    {
-                        string nomStation = row["Libelle station"].ToString().Trim();
-                        int id = Convert.ToInt32(row["ID Station"]);
-
-                        if (idParStation.ContainsKey(nomStation) != true)
-                        {
-                            idParStation[nomStation] = new List<int>();
-                        }
-
-
-                        idParStation[nomStation].Add(id);
-                        AjouterNoeud(id);
-
-                        // Ajout du nom de la station
-                        noeuds[id].Nom = nomStation;
-
-                        string ligne = row["Libelle Line"].ToString().Trim();
-                        lignesStations[id] = ligne;
+                        UseHeaderRow = true
                     }
+                });
 
-                    foreach (DataRow row in tableArcs.Rows)
+                var tableNoeuds = result.Tables[0];
+                var tableArcs = result.Tables[1];
+                var idParStation = new Dictionary<string, List<int>>();
+
+                // 1. Créer tous les noeuds avec coordonnées et ligne
+                foreach (DataRow row in tableNoeuds.Rows)
+                {
+                    int id = Convert.ToInt32(row["ID Station"]);
+                    string nom = row["Libelle station"].ToString().Trim();
+                    float longitude = float.Parse(row["Longitude"].ToString());
+                    float latitude = float.Parse(row["Latitude"].ToString());
+                    string ligne = row["Libelle Line"].ToString().Trim();
+
+                    var noeud = new Noeud<T>(id)
                     {
-                        int id = Convert.ToInt32(row["Station Id"]);
-                        double precedent = -1;
-                        double suivant = -1;
-                        double temps = 1.0;
+                        Nom = nom,
+                        X = longitude,
+                        Y = latitude
+                    };
+                    noeuds[id] = noeud;
+                    lignesStations[id] = ligne;
+                    
 
-                        if (row["Précédent"] != DBNull.Value)
-                        {
-                            precedent = Convert.ToDouble(row["Précédent"]);
-                        }
 
-                        if (row["Suivant"] != DBNull.Value)
-                        {
-                            suivant = Convert.ToDouble(row["Suivant"]);
-                        }
 
-                        if (row["Temps entre 2 stations"] != DBNull.Value)
-                        {
-                            temps = Convert.ToDouble(row["Temps entre 2 stations"]);
-                        }
-
-                        if (precedent != -1)
-                        {
-                            AjouterLien((int)precedent, id, temps);
-                        }
-
-                        if (suivant != -1)
-                        {
-                            AjouterLien(id, (int)suivant, temps);
-                        }
+                    if (idParStation.ContainsKey(nom) == false)
+                    {
+                        idParStation[nom] = new List<int>();
+                        
                     }
+                    idParStation[nom].Add(id);
 
-                    var dejaLie = new HashSet<(int, int)>();
+                }
 
-                    var dejaLiee = new HashSet<(int, int)>();
+                
+                foreach (DataRow row in tableArcs.Rows)
+                {
+                    int id = Convert.ToInt32(row["Station Id"]);
+                    double precedent = row["Précédent"] != DBNull.Value ? Convert.ToDouble(row["Précédent"]) : -1;
+                    double suivant = row["Suivant"] != DBNull.Value ? Convert.ToDouble(row["Suivant"]) : -1;
+                    double temps = row["Temps entre 2 stations"] != DBNull.Value ? Convert.ToDouble(row["Temps entre 2 stations"]) : 1.0;
 
-                    foreach (DataRow row in tableArcs.Rows)
+                    if (precedent != -1 && noeuds.ContainsKey((int)precedent)==true && noeuds.ContainsKey(id)==true)
                     {
-                        int id = Convert.ToInt32(row["Station Id"]);
-                        string nomStation = row["Station"].ToString().Trim();
+                        AjouterLien((int)precedent, id, temps);
+                    }
+                        
+                    if (suivant != -1 && noeuds.ContainsKey(id) == true && noeuds.ContainsKey((int)suivant) == true)
+                    {
+                        AjouterLien(id, (int)suivant, temps);
+                    }
+                        
+                }
 
-                        if (row["Temps de Changement"] != DBNull.Value)
+                // 3. Ajouter les correspondances
+                var dejaLie = new HashSet<(int, int)>();
+                foreach (DataRow row in tableArcs.Rows)
+                {
+                    int id = Convert.ToInt32(row["Station Id"]);
+                    string nom = row["Station"].ToString().Trim();
+
+                    if (row["Temps de Changement"] != DBNull.Value)
+                    {
+                        double temps = Convert.ToDouble(row["Temps de Changement"]);
+
+                        if (idParStation.ContainsKey(nom) == true)
                         {
-                            double tempsChangement = Convert.ToDouble(row["Temps de Changement"]);
-
-                            if (idParStation.ContainsKey(nomStation) != false)
+                            foreach (int autreId in idParStation[nom])
                             {
-                                foreach (int autreId in idParStation[nomStation])
+                                if (autreId != id)
                                 {
-                                    if (autreId != id)
+                                    var cle = (Math.Min(id, autreId), Math.Max(id, autreId));
+                                    if (dejaLie.Contains(cle) == false)
                                     {
-                                        var cle = (Math.Min(id, autreId), Math.Max(id, autreId));
-                                        if (dejaLiee.Contains(cle) != true)
-                                        {
-                                            AjouterLien(id, autreId, tempsChangement);
-                                            dejaLiee.Add(cle);
-                                        }
+                                        AjouterLien(id, autreId, temps);
+                                        dejaLie.Add(cle);
                                     }
                                 }
                             }
                         }
                     }
-
                 }
             }
         }
 
 
-
-        public Dictionary<int, List<(int, double)>> ConstruireListeAdj()
-        {
-            Dictionary<int, List<(int, double)>> listeAdj = new Dictionary<int, List<(int, double)>>();
-
-            foreach (var noeud in noeuds)
-            {
-                listeAdj[noeud.Key] = new List<(int, double)>();
-
-                foreach (var lien in noeud.Value.Liens)
-                {
-                    listeAdj[noeud.Key].Add((lien.Destination.Id, lien.Poids));
-                }
-
-                listeAdj[noeud.Key].Sort(ComparerVoisinsParId);
-            }
-
-            return listeAdj;
-        }
-
-        private int ComparerVoisinsParId((int, double) x, (int, double) y)
-        {
-            return x.Item1.CompareTo(y.Item1);
-        }
-
-
-        public void AfficherListeAdj()
-        {
-            var listeAdj = ConstruireListeAdj();
-            List<int> noeudsTries = new List<int>(listeAdj.Keys);
-            noeudsTries.Sort();
-
-            foreach (var key in noeudsTries)
-            {
-                Console.Write(key + ": ");
-                foreach (var lien in listeAdj[key])
-                {
-                    Console.Write("(" + lien.Item1 + ", " + lien.Item2 + ") ");
-                }
-                Console.WriteLine();
-            }
-        }
+        
 
         public double Dijkstra(int depart, int arrivee)
         {
@@ -228,14 +178,14 @@ namespace PROJET_PSI
 
             foreach (var identifiant in noeuds.Keys)
             {
-                distances[identifiant] = double.PositiveInfinity;
+                distances[identifiant] = double.MaxValue;
             }
             distances[depart] = 0;
 
             while (visites.Count < noeuds.Count)
             {
                 int noeudActuel = -1;
-                double distanceMinimale = double.PositiveInfinity;
+                double distanceMinimale = double.MaxValue;
 
                 foreach (var identifiant in noeuds.Keys)
                 {
@@ -331,87 +281,7 @@ namespace PROJET_PSI
 
 
 
-        public void DessinerChemin(List<int> chemin, string outputPath)
-        {
-            if (chemin == null || chemin.Count == 0) return;
-
-            const int nodeRadius = 10;
-            const int imageWidth = 1200;
-            const int imageHeight = 800;
-            const int margin = 50;
-
-            using (var bitmap = new Bitmap(imageWidth, imageHeight))
-            using (var graphics = Graphics.FromImage(bitmap))
-            {
-                graphics.Clear(Color.White);
-                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-
-                // Positionnement des nœuds
-                var nodePositions = new Dictionary<int, PointF>();
-                float stepX = (imageWidth - 2 * margin) / (float)(chemin.Count - 1);
-
-                for (int i = 0; i < chemin.Count; i++)
-                {
-                    float x = margin + i * stepX;
-                    float y = imageHeight / 2;
-                    nodePositions[chemin[i]] = new PointF(x, y);
-                }
-
-                // Dessin des liens
-                using (var edgePen = new Pen(Color.Blue, 3))
-                {
-                    for (int i = 0; i < chemin.Count - 1; i++)
-                    {
-                        int from = chemin[i];
-                        int to = chemin[i + 1];
-
-                        graphics.DrawLine(edgePen, nodePositions[from], nodePositions[to]);
-
-                        // Affichage du temps
-                        var lien = noeuds[from].Liens.First(l => l.Destination.Id == to);
-                        PointF middle = new PointF(
-                            (nodePositions[from].X + nodePositions[to].X) / 2,
-                            (nodePositions[from].Y + nodePositions[to].Y) / 2 - 15);
-
-                        graphics.DrawString($"{lien.Poids} min",
-                                         new Font("Arial", 8),
-                                         Brushes.Black,
-                                         middle);
-                    }
-                }
-
-                // Dessin des nœuds
-                using (var nodeBrush = new SolidBrush(Color.Red))
-                using (var textBrush = new SolidBrush(Color.Black))
-                {
-                    foreach (var kvp in nodePositions)
-                    {
-                        graphics.FillEllipse(nodeBrush,
-                                           kvp.Value.X - nodeRadius,
-                                           kvp.Value.Y - nodeRadius,
-                                           nodeRadius * 2,
-                                           nodeRadius * 2);
-
-                        string nom = noeuds[kvp.Key].Nom;
-                        graphics.DrawString(nom,
-                                           new Font("Arial", 8),
-                                           textBrush,
-                                           kvp.Value.X - nodeRadius,
-                                           kvp.Value.Y + nodeRadius + 5);
-
-                        graphics.DrawString(LignesStations[kvp.Key],
-                                          new Font("Arial", 7, FontStyle.Bold),
-                                          Brushes.Green,
-                                          kvp.Value.X - nodeRadius,
-                                          kvp.Value.Y + nodeRadius + 20);
-                    }
-                }
-
-                bitmap.Save(outputPath, ImageFormat.Png);
-                Console.WriteLine($"\nGraphe du chemin généré : {outputPath}");
-            }
-        }
+       
 
 
 
@@ -423,7 +293,7 @@ namespace PROJET_PSI
             // Initialisation : toutes les distances à l'infini, sauf la source à 0
             foreach (var noeud in noeuds.Keys)
             {
-                distances[noeud] = double.PositiveInfinity;
+                distances[noeud] = double.MaxValue;
             }
             distances[source] = 0;
 
@@ -519,124 +389,206 @@ namespace PROJET_PSI
 
         }
 
-        public void DessinerGraphe(string outputPath = "graphe.png")
+        public void AfficherGrapheGeo(string outputPath = "plan_metro_geo.png")
         {
-            // Paramètres ajustés pour 333 nœuds
-            const int nodeRadius = 3; // Beaucoup plus petit
-            const int imageWidth = 2500; // Image plus grande
-            const int imageHeight = 2500;
-            const int centerX = imageWidth / 2;
-            const int centerY = imageHeight / 2;
-            int circleRadius = (Math.Min(imageWidth, imageHeight) / 2) - 50;
-            const int edgeLabelMargin = 2;
+            const int imageWidth = 3000;
+            const int imageHeight = 2250;
+            const int nodeRadius = 8;
+            const int margin = 60;
+
+            float minX = noeuds.Values.Min(n => n.X);
+            float maxX = noeuds.Values.Max(n => n.X);
+            float minY = noeuds.Values.Min(n => n.Y);
+            float maxY = noeuds.Values.Max(n => n.Y);
+
+            float centerX = (minX + maxX) / 2;
+            float centerY = (minY + maxY) / 2;
+
+            float zoomX = 15000f;
+            float zoomY = 20000f;
+
+            Bitmap bitmap = new Bitmap(imageWidth, imageHeight);
+            Graphics g = Graphics.FromImage(bitmap);
+            g.Clear(Color.White);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            Font font = new Font("Arial", 12, FontStyle.Bold);
+
+            Dictionary<string, Color> couleursLignes = new Dictionary<string, Color>();
+            Color[] palette = new Color[] {
+        Color.Red, Color.Blue, Color.Green, Color.Orange, Color.Purple,
+        Color.Brown, Color.Teal, Color.DarkCyan, Color.DeepPink,
+        Color.Gold, Color.DarkGreen, Color.Black, Color.Magenta
+    };
+            int index = 0;
+            foreach (string ligne in lignesStations.Values.Distinct())
+            {
+                couleursLignes[ligne] = palette[index % palette.Length];
+                index++;
+            }
+
+            Dictionary<int, PointF> positions = new Dictionary<int, PointF>();
+            foreach (var n in noeuds.Values)
+            {
+                float x = imageWidth / 2 + (n.X - centerX) * zoomX;
+                float y = imageHeight / 2 - (n.Y - centerY) * zoomY;
+                positions[n.Id] = new PointF(x, y);
+            }
+
+            foreach (var noeud in noeuds.Values)
+            {
+                PointF start = positions[noeud.Id];
+                foreach (var lien in noeud.Liens)
+                {
+                    PointF end = positions[lien.Destination.Id];
+                    string ligne = lignesStations.ContainsKey(noeud.Id) ? lignesStations[noeud.Id] : "Inconnue";
+                    Color couleur = couleursLignes.ContainsKey(ligne) ? couleursLignes[ligne] : Color.Gray;
+                    using (Pen pen = new Pen(couleur, 5))
+                    {
+                        g.DrawLine(pen, start, end);
+                    }
+                }
+            }
+
+            foreach (var kvp in positions)
+            {
+                PointF pos = kvp.Value;
+                g.FillEllipse(Brushes.Black, pos.X - nodeRadius, pos.Y - nodeRadius, nodeRadius * 2, nodeRadius * 2);
+
+                string nom = noeuds[kvp.Key].Nom;
+                if (!string.IsNullOrWhiteSpace(nom))
+                {
+                    g.DrawString(nom, font, Brushes.Black, pos.X + 6, pos.Y - 6);
+                }
+            }
+
+            // Légende
+            int legX = imageWidth - 300;
+            int legY = 80;
+            Font legFont = new Font("Arial", 11);
+            g.FillRectangle(Brushes.White, legX - 10, legY - 30, 280, 30 + 22 * couleursLignes.Count);
+            g.DrawRectangle(Pens.Black, legX - 10, legY - 30, 280, 30 + 22 * couleursLignes.Count);
+            g.DrawString("Lignes du métro parisien :", new Font("Arial", 13, FontStyle.Bold), Brushes.Black, legX, legY - 30);
+
+            int dy = 0;
+            foreach (var kvp in couleursLignes)
+            {
+                using (Brush b = new SolidBrush(kvp.Value))
+                {
+                    g.FillRectangle(b, legX, legY + dy, 25, 12);
+                }
+                g.DrawString(kvp.Key, legFont, Brushes.Black, legX + 35, legY + dy - 2);
+                dy += 22;
+            }
+
+            bitmap.Save(outputPath, ImageFormat.Png);
+            Console.WriteLine("✅ Plan du métro géographique enregistré sous : " + outputPath);
+
+            if (File.Exists(outputPath))
+            {
+                Form fenetre = new Form();
+                fenetre.Text = "Plan du métro parisien (projection GPS)";
+                fenetre.Width = imageWidth + 50;
+                fenetre.Height = imageHeight + 50;
+                fenetre.StartPosition = FormStartPosition.CenterScreen;
+
+                PictureBox imageBox = new PictureBox();
+                imageBox.Image = Image.FromFile(outputPath);
+                imageBox.SizeMode = PictureBoxSizeMode.Zoom;
+                imageBox.Dock = DockStyle.Fill;
+
+                fenetre.Controls.Add(imageBox);
+                Application.Run(fenetre);
+            }
+        }
+        public void DessinerChemin(List<int> chemin, string outputPath)
+        {
+            if (chemin == null || chemin.Count == 0) return;
+
+            const int nodeRadius = 10;
+            const int imageWidth = 1200;
+            const int imageHeight = 800;
+            const int margin = 50;
 
             using (var bitmap = new Bitmap(imageWidth, imageHeight))
             using (var graphics = Graphics.FromImage(bitmap))
             {
-                // Configuration du dessin
                 graphics.Clear(Color.White);
                 graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
-                // Calcul des positions des nœuds
+                // Positionnement des nœuds
                 var nodePositions = new Dictionary<int, PointF>();
-                double angleStep = 2 * Math.PI / noeuds.Count;
-                double currentAngle = 0;
+                float stepX = (imageWidth - 2 * margin) / (float)(chemin.Count - 1);
 
-                // Deux cercles concentriques pour réduire la superposition
-                int circleToggle = 0;
-                int smallCircleRadius = circleRadius - 30;
-
-                foreach (var node in noeuds.Values)
+                for (int i = 0; i < chemin.Count; i++)
                 {
-                    float radius = circleToggle == 0 ? circleRadius : smallCircleRadius;
-                    float x = centerX + (float)(radius * Math.Cos(currentAngle));
-                    float y = centerY + (float)(radius * Math.Sin(currentAngle));
-                    nodePositions[node.Id] = new PointF(x, y);
-
-                    currentAngle += angleStep;
-                    circleToggle = 1 - circleToggle; // Alterne entre les deux cercles
+                    float x = margin + i * stepX;
+                    float y = imageHeight / 2;
+                    nodePositions[chemin[i]] = new PointF(x, y);
                 }
 
-                // Dessin des arêtes avec leurs poids (seulement pour les poids significatifs)
-                var drawnEdges = new HashSet<string>();
-                using (var edgePen = new Pen(Color.FromArgb(100, Color.Gray), 1)) // Arêtes semi-transparentes
-                using (var labelFont = new Font("Arial", 6))
-                using (var labelBrush = new SolidBrush(Color.Red))
+                // Dessin des liens
+                using (var edgePen = new Pen(Color.Blue, 3))
                 {
-                    foreach (var node in noeuds.Values)
+                    for (int i = 0; i < chemin.Count - 1; i++)
                     {
-                        foreach (var edge in node.Liens)
-                        {
-                            string edgeKey = $"{Math.Min(node.Id, edge.Destination.Id)}-{Math.Max(node.Id, edge.Destination.Id)}";
-                            if (!drawnEdges.Contains(edgeKey))
-                            {
-                                drawnEdges.Add(edgeKey);
+                        int from = chemin[i];
+                        int to = chemin[i + 1];
 
-                                PointF start = nodePositions[node.Id];
-                                PointF end = nodePositions[edge.Destination.Id];
+                        graphics.DrawLine(edgePen, nodePositions[from], nodePositions[to]);
 
-                                // Dessiner la ligne seulement si elle n'est pas trop courte
-                                if (Distance(start, end) > nodeRadius * 4)
-                                {
-                                    graphics.DrawLine(edgePen, start, end);
+                        // Affichage du temps
+                        var lien = noeuds[from].Liens.First(l => l.Destination.Id == to);
+                        PointF middle = new PointF(
+                            (nodePositions[from].X + nodePositions[to].X) / 2,
+                            (nodePositions[from].Y + nodePositions[to].Y) / 2 - 15);
 
-                                    // Dessiner le poids seulement si différent de 1
-                                    if (Math.Abs(edge.Poids - 1.0) > 0.01)
-                                    {
-                                        PointF middle = new PointF(
-                                            (start.X + end.X) / 2 + edgeLabelMargin,
-                                            (start.Y + end.Y) / 2 + edgeLabelMargin);
-                                        graphics.DrawString(edge.Poids.ToString("F1"), labelFont, labelBrush, middle);
-                                    }
-                                }
-                            }
-                        }
+                        graphics.DrawString($"{lien.Poids} min",
+                                         new Font("Arial", 8),
+                                         Brushes.Black,
+                                         middle);
                     }
                 }
 
-                // Dessin des nœuds (très simplifié)
-                using (var nodeBrush = new SolidBrush(Color.FromArgb(200, Color.LightBlue))) // Semi-transparent
-                using (var nodePen = new Pen(Color.Black, 0.5f))
-                using (var textFont = new Font("Arial", 5))
+                // Dessin des nœuds avec décalage dynamique des labels
+                using (var nodeBrush = new SolidBrush(Color.Red))
                 using (var textBrush = new SolidBrush(Color.Black))
                 {
+                    List<RectangleF> zonesTextes = new List<RectangleF>();
+                    Font nomFont = new Font("Arial", 8);
+                    Font ligneFont = new Font("Arial", 7, FontStyle.Bold);
+
                     foreach (var kvp in nodePositions)
                     {
-                        RectangleF nodeRect = new RectangleF(
-                            kvp.Value.X - nodeRadius,
-                            kvp.Value.Y - nodeRadius,
-                            nodeRadius * 2,
-                            nodeRadius * 2);
+                        PointF pos = kvp.Value;
+                        graphics.FillEllipse(nodeBrush, pos.X - nodeRadius, pos.Y - nodeRadius, nodeRadius * 2, nodeRadius * 2);
 
-                        graphics.FillEllipse(nodeBrush, nodeRect);
-                        graphics.DrawEllipse(nodePen, nodeRect);
+                        string nom = noeuds[kvp.Key].Nom;
+                        string ligne = LignesStations[kvp.Key];
 
-                        // On n'affiche le texte que pour certains nœuds pour éviter la surcharge
-                        if (kvp.Key % 10 == 0) // Un numéro sur 10
+                        // Calcule une position verticale disponible
+                        float labelY = pos.Y + nodeRadius + 5;
+                        float labelX = pos.X - nodeRadius;
+
+                        // Évite le chevauchement
+                        RectangleF zoneTexte = new RectangleF(labelX, labelY, 100, 14);
+                        int decalage = 0;
+                        while (zonesTextes.Any(z => z.IntersectsWith(zoneTexte)))
                         {
-                            string label = kvp.Key.ToString();
-                            SizeF textSize = graphics.MeasureString(label, textFont);
-                            PointF textPos = new PointF(
-                                kvp.Value.X - textSize.Width / 2,
-                                kvp.Value.Y - textSize.Height / 2);
-
-                            graphics.DrawString(label, textFont, textBrush, textPos);
+                            decalage += 12;
+                            zoneTexte.Y += 12;
                         }
+                        zonesTextes.Add(zoneTexte);
+
+                        // Affiche le nom et la ligne sans chevauchement
+                        graphics.DrawString(nom, nomFont, textBrush, labelX, zoneTexte.Y);
+                        graphics.DrawString(ligne, ligneFont, Brushes.Green, labelX, zoneTexte.Y + 12);
                     }
                 }
 
                 bitmap.Save(outputPath, ImageFormat.Png);
+                Console.WriteLine($"\n✅ Graphe du chemin généré : {outputPath}");
             }
-
-            Console.WriteLine("Graphe généré dans " + outputPath + ")");
-        }
-
-        private float Distance(PointF a, PointF b)
-        {
-            float dx = a.X - b.X;
-            float dy = a.Y - b.Y;
-            return (float)Math.Sqrt(dx * dx + dy * dy);
         }
 
         public void AfficherCheminDansFenetre(string cheminImage)
