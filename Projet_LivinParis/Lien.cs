@@ -3,41 +3,23 @@ using System;
 namespace PROJET_PSI
 {
     /// <summary>
-    /// Représente un lien entre deux nœuds avec un poids associé.
+    /// Représente un lien entre deux noeuds dans un graphe pondéré.
     /// </summary>
-    /// <typeparam name="T">Type des données associées au lien.</typeparam>
+    /// <typeparam name="T">Type de données contenues dans les nœuds.</typeparam>
     public class Lien<T>
     {
         /// <summary>
-        /// Nœud de destination de ce lien.
+        /// Nœud de destination du lien.
         /// </summary>
         private Noeud<T> destination;
 
         /// <summary>
-        /// Poids du lien (ex : durée du trajet entre deux stations).
+        /// Poids associé au lien.
         /// </summary>
         private double poids;
 
         /// <summary>
-        /// Informations du lien.
-        /// </summary>
-        private T info;
-
-        /// <summary>
-        /// Crée un nouveau lien vers une destination, avec un poids et une information associée.
-        /// </summary>
-        /// <param name="destination">Nœud de destination.</param>
-        /// <param name="poids">Poids du lien.</param>
-        /// <param name="info">Informations du lien.</param>
-        public Lien(Noeud<T> destination, double poids, T info)
-        {
-            this.destination = destination;
-            this.poids = poids;
-            this.info = info;
-        }
-
-        /// <summary>
-        /// Obtient ou modifie le nœud de destination du lien.
+        /// Définit le nœud de destination.
         /// </summary>
         public Noeud<T> Destination
         {
@@ -46,7 +28,7 @@ namespace PROJET_PSI
         }
 
         /// <summary>
-        /// Obtient ou modifie le poids du lien.
+        /// Définit le poids du lien.
         /// </summary>
         public double Poids
         {
@@ -55,13 +37,14 @@ namespace PROJET_PSI
         }
 
         /// <summary>
-        /// Obtient ou modifie l'information associée au lien.
+        /// Initialise un nouveau lien vers un nœud donné.
         /// </summary>
-        public T Info
+        /// <param name="dest">Noeud de destination.</param>
+        /// <param name="poids">Poids du lien.</param>
+        public Lien(Noeud<T> dest, double poids = 1.0)
         {
-            get { return info; }
-            set { info = value; }
+            this.destination = dest;
+            this.poids = poids;
         }
     }
 }
-
