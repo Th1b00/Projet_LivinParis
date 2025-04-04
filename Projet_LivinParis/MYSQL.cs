@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using MySql.Data.MySqlClient;
 
 namespace PROJET_PSI
 {
-    public class MYSQL
+    internal class MYSQL
     {
         static string connectionString = "Server=localhost;Database=LivinParis_PSI;Uid=root;Pwd=Tfmi0912;";
 
@@ -20,7 +20,9 @@ namespace PROJET_PSI
                 Console.WriteLine("4. Afficher les clients");
                 Console.WriteLine("5. Afficher les cuisiniers");
                 Console.WriteLine("6. Afficher les commandes");
-                Console.WriteLine("7. Quitter");
+                Console.WriteLine("7. Afficher les utilisateurs");
+                Console.WriteLine("8. Supprimer un utilisateur");
+                Console.WriteLine("9. Quitter");
                 Console.Write("Choix : ");
 
                 switch (Console.ReadLine())
@@ -37,7 +39,11 @@ namespace PROJET_PSI
                         break;
                     case "6": Afficher("Commande"); 
                         break;
-                    case "7": quitter = true; 
+                    case "7": Afficher("Utilisateur");
+                        break;
+                    case "8": SupprimerUtilisateur();
+                        break;
+                    case "9": quitter = true; 
                         break;
                     default: Console.WriteLine("Choix invalide."); 
                         break;
@@ -187,6 +193,25 @@ namespace PROJET_PSI
             updatePrix.ExecuteNonQuery();
 
             Console.WriteLine("Commande enregistrée avec succès.");
+        }
+
+        public static void SupprimerUtilisateur()
+        {
+            Console.WriteLine("--- Suppression d'un utilisateur ---");
+            Console.Write("ID de l'utilisateur à supprimer : ");
+            int id = int.Parse(Console.ReadLine());
+
+            var con = new MySqlConnection(connectionString);
+            con.Open();
+
+            var cmd = new MySqlCommand("DELETE FROM Utilisateur WHERE Id_Utilisateur = @Id", con);
+            cmd.Parameters.AddWithValue("@Id", id);
+            int lignes = cmd.ExecuteNonQuery();
+
+            if (lignes > 0)
+                Console.WriteLine("Utilisateur supprimé avec succès.");
+            else
+                Console.WriteLine("Aucun utilisateur trouvé avec cet ID.");
         }
 
         public static void Afficher(string table)
