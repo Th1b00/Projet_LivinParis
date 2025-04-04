@@ -25,9 +25,6 @@ namespace PROJET_PSI
                         case "1":
                             var graphe = new Graphe<int>();
                             graphe.ChargerGraphe("metro.xlsx");
-
-                            Console.WriteLine("\n\nListe d'adjacence :\n");
-                            graphe.AfficherListeAdj();
                             Console.WriteLine("\nOrdre du graphe : " + graphe.Noeuds.Count);
 
                             int taille = 0;
@@ -36,19 +33,20 @@ namespace PROJET_PSI
                                 taille += noeud.Liens.Count;
                             }
                             Console.WriteLine("Taille du graphe : " + ((taille / 2) - 1));
+                            Console.WriteLine("\nGénération du dessin du graphe complet...");
+                            graphe.AfficherGrapheGeo("graphe_metro_complet.png");
+                            Console.WriteLine("Le graphe complet a été enregistré sous 'graphe_metro_complet.png'.");
 
                             Console.WriteLine("\nEntre quels sommets souhaitez-vous calculer le plus court chemin ?");
-                            int sommetA = graphe.LireSommetValide("Sommet a : ");
-                            int sommetB = graphe.LireSommetValide("Sommet b : ");
+                            int sommetA = graphe.LireSommetValide("Sommet de départ : ");
+                            int sommetB = graphe.LireSommetValide("Sommet d'arrivée : ");
 
                             Console.WriteLine("\nDistance entre " + sommetA + " et " + sommetB + " :");
                             Console.WriteLine("Dijkstra       : " + graphe.Dijkstra(sommetA, sommetB) + " minutes");
                             Console.WriteLine("Bellman-Ford   : " + graphe.BellmanFord(sommetA, sommetB) + " minutes");
                             Console.WriteLine("Floyd-Warshall : " + graphe.FloydWarshall(sommetA, sommetB) + " minutes");
 
-                            Console.WriteLine("\nGénération du dessin du graphe complet...");
-                            graphe.DessinerGraphe("graphe_metro_complet.png");
-                            Console.WriteLine("Le graphe complet a été enregistré sous 'graphe_metro_complet.png'.");
+                            
 
                             Console.WriteLine("\nGénération du graphe du chemin...");
                             Console.WriteLine("Le graphe du chemin de " + sommetA + " à " + sommetB + " a été généré sous 'chemin_" + sommetA + "_vers_" + sommetB + ".png'");
