@@ -15,23 +15,36 @@ using System.Drawing.Drawing2D;
 
 namespace PROJET_PSI
 {
+    /// <summary>
+    /// Classe représentant un graphe orienté pondéré pour modéliser un réseau de métro.
+    /// </summary>
+    /// <typeparam name="T">Type de données que chaque noeud peut contenir.</typeparam>
     public class Graphe<T>
     {
         private Dictionary<int, Noeud<T>> noeuds = new Dictionary<int, Noeud<T>>();
         private Dictionary<int, string> lignesStations = new Dictionary<int, string>();
 
+        /// <summary>
+        /// Dictionnaire des noeuds du graphe.
+        /// </summary>
         public Dictionary<int, Noeud<T>> Noeuds
         {
             get { return noeuds; }
             set { noeuds = value; }
         }
 
+        /// <summary>
+        /// Dictionnaire associant chaque ID de station à sa ligne de métro.
+        /// </summary>
         public Dictionary<int, string> LignesStations
         {
             get { return lignesStations; }
             set { lignesStations = value; }
         }
 
+        /// <summary>
+        /// Ajoute un nœud au graphe s’il n’existe pas déjà.
+        /// </summary>
         public void AjouterNoeud(int id)
         {
             if (noeuds.ContainsKey(id) != true)
@@ -40,6 +53,9 @@ namespace PROJET_PSI
             }
         }
 
+        /// <summary>
+        /// Vérifie s’il existe un lien entre deux nœuds du graphe.
+        /// </summary>
         private bool ExisteLienEntre(int source, int destination)
         {
             foreach (var lien in noeuds[source].Liens)
@@ -52,6 +68,9 @@ namespace PROJET_PSI
             return false;
         }
 
+        /// <summary>
+        /// Ajoute un lien entre deux noeuds avec un poids donné.
+        /// </summary>
         public void AjouterLien(int id1, int id2, double poids = 1.0)
         {
             AjouterNoeud(id1);
@@ -68,7 +87,9 @@ namespace PROJET_PSI
             }
         }
 
-
+        /// <summary>
+        /// Charge les données du graphe à partir d’un fichier Excel.
+        /// </summary>
         public void ChargerGraphe(string fichier)
         {
             using (var stream = File.Open(fichier, FileMode.Open, FileAccess.Read))
@@ -86,7 +107,7 @@ namespace PROJET_PSI
                 var tableArcs = result.Tables[1];
                 var idParStation = new Dictionary<string, List<int>>();
 
-                // 1. Créer tous les noeuds avec coordonnées et ligne
+                ///Créer tous les noeuds avec coordonnées et ligne
                 foreach (DataRow row in tableNoeuds.Rows)
                 {
                     int id = Convert.ToInt32(row["ID Station"]);
@@ -103,20 +124,20 @@ namespace PROJET_PSI
                     };
                     noeuds[id] = noeud;
                     lignesStations[id] = ligne;
-                    
+
 
 
 
                     if (idParStation.ContainsKey(nom) == false)
                     {
                         idParStation[nom] = new List<int>();
-                        
+
                     }
                     idParStation[nom].Add(id);
 
                 }
 
-                
+
                 foreach (DataRow row in tableArcs.Rows)
                 {
                     int id = Convert.ToInt32(row["Station Id"]);
@@ -124,19 +145,19 @@ namespace PROJET_PSI
                     double suivant = row["Suivant"] != DBNull.Value ? Convert.ToDouble(row["Suivant"]) : -1;
                     double temps = row["Temps entre 2 stations"] != DBNull.Value ? Convert.ToDouble(row["Temps entre 2 stations"]) : 1.0;
 
-                    if (precedent != -1 && noeuds.ContainsKey((int)precedent)==true && noeuds.ContainsKey(id)==true)
+                    if (precedent != -1 && noeuds.ContainsKey((int)precedent) == true && noeuds.ContainsKey(id) == true)
                     {
                         AjouterLien((int)precedent, id, temps);
                     }
-                        
+
                     if (suivant != -1 && noeuds.ContainsKey(id) == true && noeuds.ContainsKey((int)suivant) == true)
                     {
                         AjouterLien(id, (int)suivant, temps);
                     }
-                        
+
                 }
 
-                // 3. Ajouter les correspondances
+                /// Ajouter les correspondances
                 var dejaLie = new HashSet<(int, int)>();
                 foreach (DataRow row in tableArcs.Rows)
                 {
@@ -168,8 +189,11 @@ namespace PROJET_PSI
         }
 
 
-        
 
+        /// <summary>
+        /// Calcule le chemin le plus court entre deux stations avec l’algorithme de Dijkstra.
+        /// Affiche l’itinéraire et génère une image du trajet.
+        /// </summary>
         public double Dijkstra(int depart, int arrivee)
         {
             var distances = new Dictionary<int, double>();
@@ -218,7 +242,7 @@ namespace PROJET_PSI
                 }
             }
 
-            // Reconstruction du chemin
+            /// Reconstruction du chemin
             List<int> chemin = new List<int>();
             int actuel = arrivee;
 
@@ -234,7 +258,7 @@ namespace PROJET_PSI
             string cheminImage = "chemin_" + depart + "_vers_" + arrivee + ".png";
             DessinerChemin(chemin, cheminImage);
 
-            // Affichage console
+            /// Affichage dans la console
             Console.WriteLine("\nItinéraire :");
 
             if (chemin.Count == 1)
@@ -279,25 +303,20 @@ namespace PROJET_PSI
         }
 
 
-
-
-       
-
-
-
-
+        /// <summary>
+        /// Calcule les distances minimales depuis une station avec Bellman-Ford.
+        /// </summary>
         public double BellmanFord(int source, int cible)
         {
             var distances = new Dictionary<int, double>();
 
-            // Initialisation : toutes les distances à l'infini, sauf la source à 0
+            /// Initialisation : toutes les distances à l'infini, sauf celle de départ à 0
             foreach (var noeud in noeuds.Keys)
             {
                 distances[noeud] = double.MaxValue;
             }
             distances[source] = 0;
 
-            // Relaxation des arêtes
             for (int i = 0; i < noeuds.Count - 1; i++)
             {
                 foreach (var noeud in noeuds)
@@ -315,9 +334,11 @@ namespace PROJET_PSI
             return distances[cible];
         }
 
+        /// <summary>
+        /// Calcule les plus courtes distances avec Floyd-Warshall.
+        /// </summary>
         public double FloydWarshall(int source, int cible)
         {
-            // Étape 1 : Créer une table de correspondance ID ↔ index
             var idList = noeuds.Keys.ToList();
             var idToIndex = new Dictionary<int, int>();
             var indexToId = new Dictionary<int, int>();
@@ -331,16 +352,22 @@ namespace PROJET_PSI
             int n = idList.Count;
             double[,] dist = new double[n, n];
 
-            // Étape 2 : Initialiser la matrice
             for (int i = 0; i < n; i++)
             {
                 for (int j = 0; j < n; j++)
                 {
-                    dist[i, j] = (i == j) ? 0 : -1; // -1 = pas de lien
+                    if (i == j)
+                    {
+                        dist[i, j] = 0;
+                    }
+                    else
+                    {
+                        dist[i, j] = -1;
+                    }
                 }
             }
 
-            // Étape 3 : Remplir la matrice avec les poids du graphe
+
             foreach (var noeud in noeuds)
             {
                 int i = idToIndex[noeud.Key];
@@ -351,7 +378,6 @@ namespace PROJET_PSI
                 }
             }
 
-            // Étape 4 : Algorithme Floyd-Warshall
             for (int k = 0; k < n; k++)
             {
                 for (int i = 0; i < n; i++)
@@ -370,7 +396,6 @@ namespace PROJET_PSI
                 }
             }
 
-            // Étape 5 : Traduire les ID d'entrée en indices
             if (idToIndex.ContainsKey(source) != true || idToIndex.ContainsKey(cible) != true)
             {
                 return -1;
@@ -389,12 +414,14 @@ namespace PROJET_PSI
 
         }
 
+        /// <summary>
+        /// Affiche une carte géographique du graphe avec des lignes colorées.
+        /// </summary>
         public void AfficherGrapheGeo(string outputPath = "plan_metro_geo.png")
         {
             const int imageWidth = 3000;
             const int imageHeight = 2250;
             const int nodeRadius = 8;
-            const int margin = 60;
 
             float minX = noeuds.Values.Min(n => n.X);
             float maxX = noeuds.Values.Max(n => n.X);
@@ -461,7 +488,6 @@ namespace PROJET_PSI
                 }
             }
 
-            // Légende
             int legX = imageWidth - 300;
             int legY = 80;
             Font legFont = new Font("Arial", 11);
@@ -481,7 +507,7 @@ namespace PROJET_PSI
             }
 
             bitmap.Save(outputPath, ImageFormat.Png);
-            Console.WriteLine("✅ Plan du métro géographique enregistré sous : " + outputPath);
+            Console.WriteLine("Plan du métro géographique enregistré sous : " + outputPath);
 
             if (File.Exists(outputPath))
             {
@@ -500,6 +526,10 @@ namespace PROJET_PSI
                 Application.Run(fenetre);
             }
         }
+
+        /// <summary>
+        /// Dessine une image illustrant un chemin entre plusieurs stations.
+        /// </summary>
         public void DessinerChemin(List<int> chemin, string outputPath)
         {
             if (chemin == null || chemin.Count == 0) return;
@@ -516,7 +546,6 @@ namespace PROJET_PSI
                 graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
 
-                // Positionnement des nœuds
                 var nodePositions = new Dictionary<int, PointF>();
                 float stepX = (imageWidth - 2 * margin) / (float)(chemin.Count - 1);
 
@@ -527,7 +556,6 @@ namespace PROJET_PSI
                     nodePositions[chemin[i]] = new PointF(x, y);
                 }
 
-                // Dessin des liens
                 using (var edgePen = new Pen(Color.Blue, 3))
                 {
                     for (int i = 0; i < chemin.Count - 1; i++)
@@ -537,7 +565,6 @@ namespace PROJET_PSI
 
                         graphics.DrawLine(edgePen, nodePositions[from], nodePositions[to]);
 
-                        // Affichage du temps
                         var lien = noeuds[from].Liens.First(l => l.Destination.Id == to);
                         PointF middle = new PointF(
                             (nodePositions[from].X + nodePositions[to].X) / 2,
@@ -550,7 +577,6 @@ namespace PROJET_PSI
                     }
                 }
 
-                // Dessin des nœuds avec décalage dynamique des labels
                 using (var nodeBrush = new SolidBrush(Color.Red))
                 using (var textBrush = new SolidBrush(Color.Black))
                 {
@@ -566,11 +592,9 @@ namespace PROJET_PSI
                         string nom = noeuds[kvp.Key].Nom;
                         string ligne = LignesStations[kvp.Key];
 
-                        // Calcule une position verticale disponible
                         float labelY = pos.Y + nodeRadius + 5;
                         float labelX = pos.X - nodeRadius;
 
-                        // Évite le chevauchement
                         RectangleF zoneTexte = new RectangleF(labelX, labelY, 100, 14);
                         int decalage = 0;
                         while (zonesTextes.Any(z => z.IntersectsWith(zoneTexte)))
@@ -580,17 +604,19 @@ namespace PROJET_PSI
                         }
                         zonesTextes.Add(zoneTexte);
 
-                        // Affiche le nom et la ligne sans chevauchement
                         graphics.DrawString(nom, nomFont, textBrush, labelX, zoneTexte.Y);
                         graphics.DrawString(ligne, ligneFont, Brushes.Green, labelX, zoneTexte.Y + 12);
                     }
                 }
 
                 bitmap.Save(outputPath, ImageFormat.Png);
-                Console.WriteLine($"\n✅ Graphe du chemin généré : {outputPath}");
+                Console.WriteLine($"\nGraphe du chemin généré : {outputPath}");
             }
         }
 
+        /// <summary>
+        /// Affiche une image du chemin généré dans une fenêtre.
+        /// </summary>
         public void AfficherCheminDansFenetre(string cheminImage)
         {
             if (File.Exists(cheminImage) != true)
@@ -619,6 +645,9 @@ namespace PROJET_PSI
             System.Windows.Forms.Application.Run(fenetre);
         }
 
+        /// <summary>
+        /// Demande à l’utilisateur de saisir un ID de station valide (entre 1 et 332).
+        /// </summary>
         public int LireSommetValide(string message)
         {
             int valeur = -1;
